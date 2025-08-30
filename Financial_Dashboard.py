@@ -57,8 +57,9 @@ period_options = sorted(period_filtered_df["Date"].unique())
 selected_period = st.sidebar.selectbox(f"Select {selected_period_type}", period_options)
 
 # 4) Segment Filter (Single dropdown)
-segments = ["All"] + sorted(df["Segment"].dropna().unique().tolist())
+segments = ["All"] + sorted([seg for seg in df["Segment"].dropna().unique() if seg != "All"])
 selected_segment = st.sidebar.selectbox("Segment", segments)
+
 
 # =====================
 # Filter Data
@@ -459,10 +460,32 @@ if not metrics_df.empty:
     metrics_values["Value"] = metrics_values.apply(
         lambda row: format_value(row["Metric"], row["Value"]), axis=1
     )
+    # Reusable function for styled 2-column Metrics table
+    def create_styled_metrics_table(df):
+        html_table = '<table style="width:100%; border-collapse: collapse;">'
+        
+        # Header row
+        html_table += '<tr style="background-color: #f0f2f6;">'
+        html_table += '<th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-weight: bold;">Metric</th>'
+        html_table += '<th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">Value</th>'
+        html_table += '</tr>'
+        
+        # Data rows
+        for _, row in df.iterrows():
+            metric = row["Metric"]
+            value = row["Value"]
+            html_table += "<tr>"
+            html_table += f'<td style="border: 1px solid #ddd; padding: 8px; font-weight: bold;">{metric}</td>'
+            html_table += f'<td style="border: 1px solid #ddd; padding: 8px; text-align: right;">{value}</td>'
+            html_table += "</tr>"
+        
+        html_table += "</table>"
+        return html_table
+
 
     # --- Show Table ---
     if not metrics_values.empty:
-        st.dataframe(metrics_values.set_index("Metric"))
+        st.markdown(create_styled_metrics_table(metrics_values), unsafe_allow_html=True)
     else:
         st.info("No metrics available for this selection.")
 
