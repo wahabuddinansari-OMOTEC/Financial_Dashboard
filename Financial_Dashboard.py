@@ -150,41 +150,60 @@ else:
 # Group by month and category, then pivot
 line_data = line_df.groupby(["Date", "Category"])["Amount"].sum().unstack(fill_value=0).reset_index()
 
-# Rename Date column to Month for clarity
-line_data = line_data.rename(columns={"Date": "Month"})
+# Detect possible date/month column
+date_col = None
+for col in ["Month", "Date", "Period", "Month-Year"]:
+    if col in line_data.columns:
+        date_col = col
+        break
 
-# Get Revenue and Direct Expense columns if they exist
-revenue_col = "Revenue" if "Revenue" in line_data.columns else None
-direct_exp_col = "Direct Expense" if "Direct Expense" in line_data.columns else None
-
-if revenue_col or direct_exp_col:
-    # Filter out months where both Revenue and Direct Expense are 0
-    if revenue_col and direct_exp_col:
-        line_data = line_data[(line_data[revenue_col] != 0) | (line_data[direct_exp_col] != 0)]
-        cols_to_plot = [revenue_col, direct_exp_col]
-    elif revenue_col:
-        line_data = line_data[line_data[revenue_col] != 0]
-        cols_to_plot = [revenue_col]
-    else:
-        line_data = line_data[line_data[direct_exp_col] != 0]
-        cols_to_plot = [direct_exp_col]
-    
-    if not line_data.empty:
-        fig1 = px.line(line_data, x="Month", y=cols_to_plot, markers=True,
-                       title="Revenue vs Direct Expense (Monthly)")
-        
-        # Add data labels to each trace
-        for i, trace in enumerate(fig1.data):
-            trace.text = [f"₹{val:,.0f}" for val in trace.y]
-            trace.textposition = "top center"
-            trace.mode = "lines+markers+text"
-        
-        fig1.update_layout(xaxis_title="Month", yaxis_title="Amount (₹)")
-        st.plotly_chart(fig1, use_container_width=True)
-    else:
-        st.warning("No data available for line chart (all months have zero revenue and direct expense).")
+if date_col is None:
+    st.warning("No date/month column found in data for line chart.")
 else:
-    st.warning("Revenue or Direct Expense data not found for line chart.")
+    # Convert to datetime
+    line_data["Month_dt"] = pd.to_datetime(line_data[date_col], errors="coerce")
+
+    # Create month labels (e.g., Apr, May, Jun)
+    line_data["Month_Label"] = line_data["Month_dt"].dt.strftime("%b")
+
+    # Get Revenue and Direct Expense columns if they exist
+    revenue_col = "Revenue" if "Revenue" in line_data.columns else None
+    direct_exp_col = "Direct Expense" if "Direct Expense" in line_data.columns else None
+
+    if revenue_col or direct_exp_col:
+        # Filter out months where both Revenue and Direct Expense are 0
+        if revenue_col and direct_exp_col:
+            line_data = line_data[(line_data[revenue_col] != 0) | (line_data[direct_exp_col] != 0)]
+            cols_to_plot = [revenue_col, direct_exp_col]
+        elif revenue_col:
+            line_data = line_data[line_data[revenue_col] != 0]
+            cols_to_plot = [revenue_col]
+        else:
+            line_data = line_data[line_data[direct_exp_col] != 0]
+            cols_to_plot = [direct_exp_col]
+
+        if not line_data.empty:
+            fig1 = px.line(
+                line_data,
+                x="Month_Label",
+                y=cols_to_plot,
+                markers=True,
+                title="Revenue vs Direct Expense (Monthly)"
+            )
+
+            # Add data labels
+            for i, trace in enumerate(fig1.data):
+                trace.text = [f"₹{val:,.0f}" for val in trace.y]
+                trace.textposition = "top center"
+                trace.mode = "lines+markers+text"
+
+            fig1.update_layout(xaxis_title="Month", yaxis_title="Amount (₹)")
+            st.plotly_chart(fig1, use_container_width=True)
+        else:
+            st.warning("No data available for line chart (all months have zero revenue and direct expense).")
+    else:
+        st.warning("Revenue or Direct Expense data not found for line chart.")
+
 
 # =====================
 # Segment Wise Gross Profit Bar Chart
